@@ -14,6 +14,34 @@ The imported `web-build/` content is retained for reference and provenance, but 
 
 - Existing app workspace under `client/` plus a real backend entrypoint under `server/_core/index.ts` and tRPC router surface under `server/routers.ts`.
 - Local development SSO bootstrap endpoints (`/api/auth/sso/start` -> `/api/oauth/callback`) for authenticated shell development.
+# coms
+
+`coms` is a full-stack operations dashboard for teams that need a single place to monitor and manage:
+
+- Cloudflare Workers
+- GitHub activity and repository data
+- Google Drive integrations
+- Gemini-powered chat with persisted conversations
+
+Built with Manus.
+
+## Status
+
+This repository is currently in an early stage with documentation-first scaffolding.
+# espacios-me/coms
+
+## Current repository status
+
+This repository currently contains a **transition-state codebase**:
+
+1. A modern TypeScript/React project scaffold and supporting backend/config files.
+2. A preserved `web-build/` folder with imported static dashboard HTML artifacts.
+
+The imported `web-build/` content is retained for reference and provenance, but it is **not a complete runnable build** of the original dashboard.
+
+## What exists today
+
+- Existing app/rebuild workspace under `client/` and project tooling (`package.json`, Vite, TypeScript, Drizzle, Wrangler).
 - Imported static dashboard route artifacts in `web-build/`:
   - `index.html`
   - `workers.html`
