@@ -17,8 +17,7 @@ import {
   ArrowLeft
 } from "lucide-react";
 
-// Change this to your deployed Worker URL after running `wrangler deploy`
-const BACKEND_URL = "http://localhost:8787";
+const BACKEND_URL = "https://atom-backend.thekeifferjapeth.workers.dev";
 
 const INTEGRATIONS = [
   { id: 'cloudflare', name: 'Cloudflare', category: 'Hosting', icon: Cloud, color: 'text-orange-500' },
