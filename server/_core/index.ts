@@ -25,6 +25,59 @@ app.get("/api/health", (_req, res) => {
   res.json({ ok: true, uptime: process.uptime() });
 });
 
+
+app.post("/chat", async (req, res) => {
+  const message = typeof req.body?.message === "string" ? req.body.message : "";
+
+  if (!message.trim()) {
+    res.status(400).json({ reply: "Please send a message." });
+    return;
+  }
+
+  const accountId = process.env.ACCOUNT_ID || "";
+  const gatewayId = process.env.GATEWAY_ID || "";
+  const token = process.env.CF_AIG_TOKEN || "";
+
+  if (!accountId || !gatewayId || !token) {
+    res.status(200).json({ reply: "Atom dev mode: configure ACCOUNT_ID, GATEWAY_ID, and CF_AIG_TOKEN to enable Gemini." });
+    return;
+  }
+
+  const url = `https://gateway.ai.cloudflare.com/v1/${accountId}/${gatewayId}/google-ai-studio/v1/models/gemini-2.5-flash:generateContent`;
+
+  try {
+    const upstream = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "cf-aig-authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: message }],
+          },
+        ],
+      }),
+    });
+
+    const data = (await upstream.json()) as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      error?: { message?: string };
+    };
+
+    const reply =
+      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
+      data?.error?.message ||
+      "Atom could not generate a response right now.";
+
+    res.status(upstream.ok ? 200 : 502).json({ reply });
+  } catch {
+    res.status(500).json({ reply: "Gateway request failed. Check env vars and network." });
+  }
+});
+
 app.get("/api/auth/sso/start", (req, res) => {
   const state = typeof req.query.state === "string" ? req.query.state : "";
   const redirect = `/api/oauth/callback${state ? `?state=${encodeURIComponent(state)}` : ""}`;
