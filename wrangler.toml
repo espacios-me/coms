@@ -1,48 +1,7 @@
-name = "command-center"
-type = "javascript"
-account_id = "b1b843ec85bc39a3a4d370ba4f84f17a"
-workers_dev = true
-route = ""
-zone_id = ""
-main = "dist/index.js"
+name = "chatspacr"
+main = "src/worker.ts"
+compatibility_date = "2026-03-29"
 
-[env.production]
-name = "command-center-prod"
-route = "espacios.me/coms"
-zone_id = ""
-
-[build]
-command = "pnpm build"
-cwd = "./"
-watch_paths = ["client/src/**/*.tsx", "server/**/*.ts"]
-
-[build.upload]
-format = "service-worker"
-
-[env.development]
-name = "command-center-dev"
-workers_dev = true
-
-# Environment variables
-[env.production.vars]
-DATABASE_URL = ""
-VITE_FRONTEND_FORGE_API_URL = "https://espacios.me/coms"
-VITE_FRONTEND_FORGE_API_KEY = ""
-
-[env.development.vars]
-DATABASE_URL = ""
-VITE_FRONTEND_FORGE_API_URL = "http://localhost:3000"
-VITE_FRONTEND_FORGE_API_KEY = ""
-
-# KV Namespace bindings (for future use)
-[[kv_namespaces]]
-binding = "CACHE"
-id = ""
-preview_id = ""
-
-# D1 Database bindings (for future use)
-[[d1_databases]]
-binding = "DB"
-database_name = "command-center"
-database_id = ""
-preview_database_id = ""
+[vars]
+ACCOUNT_ID = "YOUR_ACCOUNT_ID"
+GATEWAY_ID = "YOUR_GATEWAY_ID"
