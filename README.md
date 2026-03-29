@@ -1,3 +1,19 @@
+# espacios-me/coms
+
+## Current repository status
+
+This repository currently contains a **transition-state codebase**:
+
+1. A runnable TypeScript React + Express/tRPC development stack (`npm run dev`).
+2. An initial Atom tab shell (`Atom`, `Integrations`, `Panel`, `Friends`) ready for real product iteration.
+3. A preserved `web-build/` folder with imported static dashboard HTML artifacts.
+
+The imported `web-build/` content is retained for reference and provenance, but it is **not a complete runnable build** of the original dashboard.
+
+## What exists today
+
+- Existing app workspace under `client/` plus a real backend entrypoint under `server/_core/index.ts` and tRPC router surface under `server/routers.ts`.
+- Local development SSO bootstrap endpoints (`/api/auth/sso/start` -> `/api/oauth/callback`) for authenticated shell development.
 # coms
 
 `coms` is a full-stack operations dashboard for teams that need a single place to monitor and manage:

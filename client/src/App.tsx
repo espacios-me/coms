@@ -1,3 +1,7 @@
+import AtomChat from "@/pages/AtomChat";
+
+function App() {
+  return <AtomChat />;
 import React, { useRef, useState, useEffect } from "react";
 import {
   FolderOpen,
