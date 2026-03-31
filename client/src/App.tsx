@@ -1,383 +1,263 @@
-import React, { useRef, useState, useEffect } from "react";
+import { useEffect, useMemo, useState, type ComponentType } from 'react';
 import {
-  FolderOpen,
-  Github,
-  Mail,
-  Mic,
-  Plus,
-  Send,
-  Sparkles,
-  LayoutGrid,
-  BookOpen,
-  Loader2,
-  Cloud,
-  Key,
+  Archive,
   CheckCircle2,
-  AlertCircle,
-  ArrowLeft
-} from "lucide-react";
+  CircleDot,
+  ClipboardCheck,
+  Layers,
+  MinusCircle,
+  PauseCircle,
+  Plus,
+  RotateCcw,
+  Thermometer,
+  XCircle,
+} from 'lucide-react';
 
-const BACKEND_URL = "https://atom-backend.thekeifferjapeth.workers.dev";
+type StatusKey =
+  | 'In progress'
+  | 'To-do'
+  | 'In Review'
+  | 'Design Review'
+  | 'Rework'
+  | 'Done'
+  | 'Not Started'
+  | 'Blocked'
+  | 'On Hold'
+  | 'Archived';
 
-const INTEGRATIONS = [
-  { id: 'cloudflare', name: 'Cloudflare', category: 'Hosting', icon: Cloud, color: 'text-orange-500' },
-  { id: 'google_drive', name: 'Google Drive', category: 'Storage', icon: FolderOpen, color: 'text-yellow-500' },
-  { id: 'github', name: 'GitHub', category: 'Development', icon: Github, color: 'text-white' },
-  { id: 'gmail', name: 'Gmail', category: 'Communication', icon: Mail, color: 'text-red-400' },
-  { id: 'notion', name: 'Notion', category: 'Productivity', icon: BookOpen, color: 'text-neutral-300' },
+type Task = {
+  id: number;
+  title: string;
+  status: StatusKey;
+  assignee: string;
+  dueAt: string;
+};
+
+type Integration = {
+  id: string;
+  name: string;
+  connected: boolean;
+};
+
+type DashboardPayload = {
+  room: string;
+  temperature: number;
+  humidity: number;
+  powerUsage: number;
+};
+
+type ChatMessage = {
+  role: 'user' | 'assistant';
+  text: string;
+};
+
+const API_BASE = import.meta.env.VITE_API_BASE ?? '';
+
+const STATUS_META: Array<{ label: StatusKey; color: string; icon: ComponentType<{ className?: string; size?: number }> }> = [
+  { label: 'In progress', color: '#35D2FF', icon: CircleDot },
+  { label: 'To-do', color: '#8B8DFF', icon: Plus },
+  { label: 'In Review', color: '#F6D24B', icon: ClipboardCheck },
+  { label: 'Design Review', color: '#9D82FF', icon: Layers },
+  { label: 'Rework', color: '#FF6868', icon: RotateCcw },
+  { label: 'Done', color: '#43F28A', icon: CheckCircle2 },
+  { label: 'Not Started', color: '#FF7CC7', icon: MinusCircle },
+  { label: 'Blocked', color: '#FF5D5D', icon: XCircle },
+  { label: 'On Hold', color: '#76A8FF', icon: PauseCircle },
+  { label: 'Archived', color: '#C9CED7', icon: Archive },
 ];
 
-const quickPrompts = [
-  { label: "Check Cloudflare status", icon: Cloud },
-  { label: "Summarize my emails", icon: Mail },
-  { label: "Fetch GitHub data", icon: Github },
-  { label: "Search Google Drive", icon: FolderOpen },
-];
-
-function ChatBubble({ role, text }) {
-  const isUser = role === "user";
-  return (
-    <div className={`flex w-full ${isUser ? "justify-end" : "justify-start"} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
-      <div className={`max-w-[85%] rounded-[24px] px-4 py-3 text-[15px] leading-relaxed shadow-lg backdrop-blur-md
-          ${isUser ? "rounded-br-[4px] bg-blue-600 text-white" : "rounded-bl-[4px] border border-white/10 bg-white/5 text-white/90"}`}>
-        {text}
-      </div>
-    </div>
-  );
-}
-
-function LoginScreen({ onLogin }) {
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [error, setError] = useState("");
-
-  const handleSSO = async (provider) => {
-    setIsConnecting(true);
-    setError("");
-    try {
-      const response = await fetch(`${BACKEND_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider })
-      });
-      if (response.ok) {
-        const data = await response.json();
-        onLogin(data.user);
-      } else {
-        setError("Login failed. Check your backend.");
-      }
-    } catch {
-      setError("Network error. Is your Worker running?");
-    } finally {
-      setIsConnecting(false);
-    }
-  };
-
-  return (
-    <div className="flex h-full w-full flex-col items-center justify-center bg-[#0A0D14] p-6 text-white animate-in fade-in duration-500 relative overflow-hidden">
-      <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[60%] bg-blue-600/10 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-[-20%] right-[-20%] w-[60%] h-[60%] bg-indigo-600/10 blur-[120px] rounded-full pointer-events-none" />
-
-      <div className="relative z-10 mb-10 flex flex-col items-center">
-        <div className="flex h-20 w-20 items-center justify-center rounded-[24px] bg-gradient-to-br from-blue-500 to-indigo-600 shadow-[0_0_60px_rgba(59,130,246,0.4)] mb-8">
-          <Sparkles className="h-10 w-10 text-white" />
-        </div>
-        <h1 className="text-3xl font-bold tracking-tight">Welcome to Atom</h1>
-        <p className="mt-3 text-center text-[15px] text-white/50 max-w-[280px]">
-          Sign in to access your AI assistant and integrations.
-        </p>
-      </div>
-
-      <div className="relative z-10 w-full max-w-sm space-y-3">
-        {error && (
-          <div className="mb-4 rounded-xl bg-red-500/10 p-3 text-center text-sm text-red-400 border border-red-500/20">
-            {error}
-          </div>
-        )}
-        {['google', 'microsoft', 'github'].map((provider) => (
-          <button
-            key={provider}
-            onClick={() => handleSSO(provider)}
-            disabled={isConnecting}
-            className="group flex w-full items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-[15px] font-medium capitalize transition-all hover:bg-white/10 hover:border-white/20 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isConnecting ? <Loader2 className="h-5 w-5 animate-spin text-white/50" /> : `Continue with ${provider}`}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function IntegrationsView({ onBack, connectedApps, toggleApp, onLogout }) {
-  const [geminiKey, setGeminiKey] = useState("");
-  const [geminiStatus, setGeminiStatus] = useState({ loading: false, result: null, error: false });
-
-  const handleTestGemini = async () => {
-    if (!geminiKey) return;
-    setGeminiStatus({ loading: true, result: null, error: false });
-    try {
-      const res = await fetch(`${BACKEND_URL}/api/test-keys`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey: geminiKey })
-      });
-      const data = await res.json();
-      setGeminiStatus({ loading: false, result: data.message, error: !data.success });
-    } catch {
-      setGeminiStatus({ loading: false, result: "Network error.", error: true });
-    }
-  };
-
-  return (
-    <div className="flex flex-col h-full bg-[#0A0D14] animate-in fade-in slide-in-from-right-4 duration-300">
-      <div className="px-6 pt-12 pb-6 border-b border-white/5 bg-black/20 backdrop-blur-xl">
-        <div className="flex items-center gap-4">
-          <button onClick={onBack} className="p-2 -ml-2 rounded-full hover:bg-white/5 text-white/60 hover:text-white transition-colors">
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <h2 className="text-xl font-bold">Apps & Settings</h2>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-6 space-y-8 pb-32 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <section>
-          <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-400 mb-4">Connected Tools</h3>
-          <div className="grid gap-3">
-            {INTEGRATIONS.map((app) => {
-              const isConnected = connectedApps.includes(app.id);
-              const Icon = app.icon;
-              return (
-                <div key={app.id} className="flex items-center justify-between p-4 rounded-2xl border border-white/5 bg-white/[0.02] transition-all hover:bg-white/[0.04]">
-                  <div className="flex items-center gap-4">
-                    <div className={`h-10 w-10 flex items-center justify-center rounded-xl bg-white/5 ${app.color}`}>
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-sm">{app.name}</h4>
-                      <p className="text-xs text-white/30">{app.category}</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => toggleApp(app.id)}
-                    className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
-                      isConnected ? "bg-green-500/10 text-green-400 border border-green-500/20" : "bg-white text-black hover:bg-white/90"
-                    }`}
-                  >
-                    {isConnected ? 'Connected' : 'Connect'}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        <section className="p-5 rounded-2xl bg-white/[0.02] border border-white/10">
-          <div className="flex items-center gap-2 mb-4 text-white/80">
-            <Key className="h-4 w-4" />
-            <h4 className="text-sm font-bold">API Key Tester</h4>
-          </div>
-          <p className="text-xs text-white/40 mb-5 leading-relaxed">
-            Test your Gemini key against the backend. Once confirmed, set it as a Cloudflare secret with <code className="text-blue-400">wrangler secret put GEMINI_API_KEY</code>.
-          </p>
-          <div className="space-y-2">
-            <label className="text-[11px] font-bold uppercase text-white/50">Gemini API Key</label>
-            <div className="flex gap-2">
-              <input
-                type="password"
-                value={geminiKey}
-                onChange={(e) => setGeminiKey(e.target.value)}
-                placeholder="AIzaSy..."
-                className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-blue-500/50"
-              />
-              <button
-                onClick={handleTestGemini}
-                disabled={geminiStatus.loading || !geminiKey}
-                className="bg-blue-600/20 text-blue-400 px-4 py-2 rounded-xl text-sm font-bold hover:bg-blue-600/30 disabled:opacity-50"
-              >
-                {geminiStatus.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Test"}
-              </button>
-            </div>
-            {geminiStatus.result && (
-              <p className={`text-xs flex items-center gap-1 ${geminiStatus.error ? 'text-red-400' : 'text-green-400'}`}>
-                {geminiStatus.error ? <AlertCircle className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}
-                {geminiStatus.result}
-              </p>
-            )}
-          </div>
-        </section>
-
-        <section className="pt-4 border-t border-white/10">
-          <button
-            onClick={onLogout}
-            className="w-full rounded-xl border border-red-500/20 bg-red-500/10 py-3 text-sm font-bold text-red-400 transition-colors hover:bg-red-500/20"
-          >
-            Sign Out
-          </button>
-        </section>
-      </div>
-    </div>
-  );
+async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+    ...init,
+  });
+  if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+  return res.json() as Promise<T>;
 }
 
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [view, setView] = useState("chat");
-  const [messages, setMessages] = useState([
-    { id: "init-1", role: "assistant", text: "Welcome back. I'm connected to your Cloudflare backend." },
-    { id: "init-2", role: "assistant", text: "Ask me anything — I can check your Cloudflare status, help with emails, or pull GitHub data." }
-  ]);
-  const [input, setInput] = useState("");
-  const [connectedApps, setConnectedApps] = useState(['cloudflare', 'github']);
-  const [isLoading, setIsLoading] = useState(false);
-  const scrollRef = useRef(null);
+  const [activeStatus, setActiveStatus] = useState<StatusKey>('In progress');
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [integrations, setIntegrations] = useState<Integration[]>([]);
+  const [dashboard, setDashboard] = useState<DashboardPayload | null>(null);
+  const [chat, setChat] = useState<ChatMessage[]>([{ role: 'assistant', text: 'Control center online.' }]);
+  const [input, setInput] = useState('');
+
+  const loadData = async () => {
+    try {
+      const [taskData, integrationData, dashboardData] = await Promise.all([
+        api<Task[]>('/api/tasks'),
+        api<Integration[]>('/api/integrations'),
+        api<DashboardPayload>('/api/dashboard'),
+      ]);
+      setTasks(taskData);
+      setIntegrations(integrationData);
+      setDashboard(dashboardData);
+    } catch {
+      setDashboard({ room: 'Living Room', temperature: 68, humidity: 48.2, powerUsage: 72 });
+      setTasks([
+        { id: 1, title: 'Guild Real Estate Portal', status: 'In progress', assignee: 'Keiffer', dueAt: '2026-04-02' },
+        { id: 2, title: 'Broker CRM relayout', status: 'Design Review', assignee: 'Design Team', dueAt: '2026-04-03' },
+      ]);
+      setIntegrations([
+        { id: 'github', name: 'GitHub', connected: true },
+        { id: 'cloudflare', name: 'Cloudflare', connected: true },
+        { id: 'whatsapp', name: 'WhatsApp', connected: false },
+      ]);
+    }
+  };
 
   useEffect(() => {
-    if (scrollRef.current && view === "chat" && isAuthenticated) {
-      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-    }
-  }, [messages, view, isAuthenticated]);
+    loadData();
+  }, []);
 
-  const toggleApp = (id) => {
-    setConnectedApps(prev => prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]);
-  };
+  const filteredTasks = useMemo(() => tasks.filter((task) => task.status === activeStatus), [tasks, activeStatus]);
 
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    setCurrentUser(null);
-    setView("chat");
-  };
-
-  const handleSend = async (rawText) => {
-    const text = rawText?.trim();
-    if (!text || isLoading) return;
-
-    const userMessage = { id: `user-${Date.now()}`, role: "user", text };
-    setMessages(prev => [...prev, userMessage]);
-    setInput("");
-    setIsLoading(true);
-
+  const toggleIntegration = async (id: string) => {
+    const item = integrations.find((entry) => entry.id === id);
+    if (!item) return;
+    const next = !item.connected;
+    setIntegrations((prev) => prev.map((entry) => (entry.id === id ? { ...entry, connected: next } : entry)));
     try {
-      const response = await fetch(`${BACKEND_URL}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: [...messages, { role: "user", text }],
-          connectedApps
-        })
-      });
-
-      if (!response.ok) throw new Error("Backend error");
-      const data = await response.json();
-      setMessages(prev => [...prev, { id: `ai-${Date.now()}`, role: "assistant", text: data.reply }]);
+      await api(`/api/integrations/${id}/${next ? 'connect' : 'disconnect'}`, { method: 'POST' });
     } catch {
-      setMessages(prev => [...prev, { id: `err-${Date.now()}`, role: "assistant", text: "Network error. Is the Worker running?" }]);
-    } finally {
-      setIsLoading(false);
+      setIntegrations((prev) => prev.map((entry) => (entry.id === id ? { ...entry, connected: item.connected } : entry)));
+    }
+  };
+
+  const sendMessage = async () => {
+    const text = input.trim();
+    if (!text) return;
+    setInput('');
+    setChat((prev) => [...prev, { role: 'user', text }]);
+    try {
+      const response = await api<{ reply: string }>('/api/chat', {
+        method: 'POST',
+        body: JSON.stringify({ prompt: text }),
+      });
+      setChat((prev) => [...prev, { role: 'assistant', text: response.reply }]);
+    } catch {
+      setChat((prev) => [...prev, { role: 'assistant', text: 'Backend unavailable. Please retry.' }]);
     }
   };
 
   return (
-    <div className="flex h-screen w-full items-center justify-center bg-[#020408] sm:p-4 overflow-hidden font-sans text-white relative">
-      <div className="relative flex h-full w-full max-w-md flex-col overflow-hidden sm:h-[800px] sm:rounded-[40px] border border-white/10 bg-[#0A0D14] shadow-2xl">
+    <main className="min-h-screen bg-[#0A0A0C] text-white px-5 py-8 md:px-10">
+      <section className="max-w-6xl mx-auto space-y-8">
+        <header className="rounded-3xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-6 md:p-8 shadow-[0_25px_100px_rgba(0,0,0,0.45)]">
+          <h1 className="text-3xl md:text-5xl font-semibold tracking-tight">Fullstack Command Center</h1>
+          <p className="text-zinc-400 mt-2">Frontend + backend functional page with glass UI and status workflow.</p>
+        </header>
 
-        {!isAuthenticated ? (
-          <LoginScreen onLogin={(user) => { setCurrentUser(user); setIsAuthenticated(true); }} />
-        ) : view === "chat" ? (
-          <>
-            <div className="absolute inset-x-0 top-0 z-30 border-b border-white/5 bg-[#0A0D14]/60 px-6 py-5 backdrop-blur-xl">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600">
-                    <Sparkles className="h-5 w-5 text-white" />
-                  </div>
+        <div className="flex flex-wrap gap-4 justify-center py-3">
+          {STATUS_META.map(({ label, color, icon: Icon }) => {
+            const active = activeStatus === label;
+            return (
+              <button
+                key={label}
+                onClick={() => setActiveStatus(label)}
+                className="rounded-full px-5 py-3 border transition-all duration-300 flex items-center gap-2"
+                style={{
+                  borderColor: `${color}A6`,
+                  color,
+                  background: active ? `linear-gradient(145deg, ${color}2e, rgba(255,255,255,0.08))` : 'rgba(255,255,255,0.03)',
+                  boxShadow: active ? `0 0 20px ${color}66` : `0 0 12px ${color}33`,
+                }}
+              >
+                <Icon size={18} />
+                <span className="text-lg md:text-2xl font-medium">{label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <section className="grid md:grid-cols-3 gap-5">
+          <article className="md:col-span-2 rounded-3xl border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-6 space-y-4">
+            <h2 className="text-xl font-semibold">{activeStatus} Tasks</h2>
+            <div className="space-y-3">
+              {filteredTasks.length === 0 && <p className="text-zinc-500">No items in this status.</p>}
+              {filteredTasks.map((task) => (
+                <div key={task.id} className="rounded-2xl border border-white/10 bg-black/20 p-4 flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-400">Atom</p>
-                    <h1 className="text-xl font-bold text-white/95">chatspacr</h1>
+                    <p className="font-medium">{task.title}</p>
+                    <p className="text-sm text-zinc-400">{task.assignee} • Due {task.dueAt}</p>
                   </div>
-                </div>
-                <button
-                  onClick={() => setView("integrations")}
-                  className="relative flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/5 transition-colors"
-                >
-                  <LayoutGrid className="h-5 w-5 text-white/60" />
-                  {connectedApps.length > 0 && (
-                    <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-blue-500 border border-[#0A0D14]" />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 pb-44 pt-32 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <div className="flex flex-col gap-5">
-                {messages.map((m) => <ChatBubble key={m.id} role={m.role} text={m.text} />)}
-                {isLoading && (
-                  <div className="flex w-full justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <div className="max-w-[85%] rounded-[24px] rounded-bl-[4px] border border-white/10 bg-white/5 px-4 py-3 shadow-lg backdrop-blur-md">
-                      <Loader2 className="h-5 w-5 animate-spin text-blue-400" />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-8">
-                <p className="mb-4 text-[10px] font-bold uppercase tracking-[0.15em] text-white/30">Quick Actions</p>
-                <div className="flex flex-wrap gap-2">
-                  {quickPrompts.map((p) => (
-                    <button key={p.label} onClick={() => handleSend(p.label)} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-medium text-white/70 hover:bg-white/10 transition-all">
-                      <p.icon className="h-3.5 w-3.5 text-blue-400" />
-                      {p.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="absolute inset-x-0 bottom-0 z-40 p-4 pb-8 sm:pb-6">
-              <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-2 shadow-2xl backdrop-blur-2xl ring-1 ring-white/5">
-                <div className="flex items-center gap-2">
-                  <button className="flex h-12 w-12 items-center justify-center rounded-[20px] bg-white/[0.05] text-white/60 hover:text-white transition-colors">
-                    <Plus className="h-5 w-5" />
-                  </button>
-                  <input
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSend(input)}
-                    placeholder="Message Atom..."
-                    className="flex-1 bg-transparent px-2 text-[15px] outline-none placeholder:text-white/30 disabled:opacity-50"
-                    disabled={isLoading}
-                  />
                   <button
-                    onClick={() => handleSend(input)}
-                    disabled={!input.trim() || isLoading}
-                    className={`flex h-12 w-12 items-center justify-center rounded-[20px] transition-all ${input.trim() && !isLoading ? "bg-blue-600 text-white" : "bg-white/5 text-white/20"}`}
+                    onClick={() => setActiveStatus('Done')}
+                    className="text-xs px-3 py-1 rounded-full border border-emerald-500/30 text-emerald-300"
                   >
-                    {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+                    Mark done
                   </button>
                 </div>
-                <div className="mt-2 flex items-center justify-between px-3 pt-1 border-t border-white/5">
-                  <div className="flex gap-2">
-                    {connectedApps.slice(0, 4).map(appId => {
-                      const app = INTEGRATIONS.find(a => a.id === appId);
-                      return app ? <app.icon key={appId} className={`h-3.5 w-3.5 ${app.color} opacity-60`} title={app.name} /> : null;
-                    })}
-                  </div>
-                  <button className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-white/30 hover:text-white transition-colors">
-                    <Mic className="h-3 w-3" /> Voice
-                  </button>
-                </div>
+              ))}
+            </div>
+          </article>
+
+          <article className="rounded-3xl border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-6 space-y-4">
+            <h2 className="text-xl font-semibold">Room Telemetry</h2>
+            <div className="grid grid-cols-2 gap-3 text-center">
+              <div className="rounded-2xl bg-black/25 border border-white/10 p-3">
+                <Thermometer className="mx-auto mb-1 text-sky-400" size={18} />
+                <p className="text-2xl font-semibold">{dashboard?.temperature ?? '--'}°F</p>
+              </div>
+              <div className="rounded-2xl bg-black/25 border border-white/10 p-3">
+                <p className="text-zinc-400 text-xs uppercase">Humidity</p>
+                <p className="text-2xl font-semibold">{dashboard?.humidity ?? '--'}%</p>
+              </div>
+              <div className="rounded-2xl bg-black/25 border border-white/10 p-3 col-span-2">
+                <p className="text-zinc-400 text-xs uppercase">Power consumption</p>
+                <p className="text-2xl font-semibold">{dashboard?.powerUsage ?? '--'} w/h</p>
               </div>
             </div>
-          </>
-        ) : (
-          <IntegrationsView
-            onBack={() => setView("chat")}
-            connectedApps={connectedApps}
-            toggleApp={toggleApp}
-            onLogout={handleLogout}
-          />
-        )}
-      </div>
-    </div>
+          </article>
+        </section>
+
+        <section className="grid md:grid-cols-2 gap-5">
+          <article className="rounded-3xl border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-6">
+            <h2 className="text-xl font-semibold mb-4">Integrations</h2>
+            <div className="grid grid-cols-2 gap-3">
+              {integrations.map((integration) => (
+                <button
+                  key={integration.id}
+                  onClick={() => toggleIntegration(integration.id)}
+                  className="rounded-2xl border border-white/10 bg-black/25 p-3 text-left"
+                >
+                  <p className="font-medium">{integration.name}</p>
+                  <p className={integration.connected ? 'text-emerald-400 text-sm' : 'text-zinc-500 text-sm'}>
+                    {integration.connected ? 'Connected' : 'Disconnected'}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </article>
+
+          <article className="rounded-3xl border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-6 flex flex-col">
+            <h2 className="text-xl font-semibold mb-4">AI Assistant</h2>
+            <div className="flex-1 space-y-3 overflow-y-auto max-h-56 pr-1">
+              {chat.map((message, idx) => (
+                <div
+                  key={`${message.role}-${idx.toString()}`}
+                  className={`rounded-2xl p-3 text-sm ${message.role === 'user' ? 'bg-sky-500/20 border border-sky-400/30 ml-8' : 'bg-black/25 border border-white/10 mr-8'}`}
+                >
+                  {message.text}
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 flex gap-2">
+              <input
+                className="flex-1 rounded-xl bg-black/30 border border-white/15 px-3 py-2 text-sm"
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                onKeyDown={(event) => event.key === 'Enter' && sendMessage()}
+                placeholder="Ask backend AI helper..."
+              />
+              <button onClick={sendMessage} className="px-4 py-2 rounded-xl bg-sky-500 text-black font-semibold text-sm">
+                Send
+              </button>
+            </div>
+          </article>
+        </section>
+      </section>
+    </main>
   );
 }
